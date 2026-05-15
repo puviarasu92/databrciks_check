@@ -1,0 +1,47 @@
+# CI Pipeline – runs on every PR to main
+name: CI - Validate & Test
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Validate bundle (dev)
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_DEV }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_DEV }}
+        run: |
+          databricks bundle validate \
+            --target dev \
+            --var="databricks_host=$DATABRICKS_HOST" \
+            --var="cluster_id=${{ secrets.CLUSTER_ID_DEV }}"
+
+  sql-lint:
+    name: Lint SQL Notebooks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install sqlfluff
+        run: pip install sqlfluff sqlfluff-templater-jinja
+
+      - name: Lint SQL files
+        run: |
+          sqlfluff lint src/notebooks/ \
+            --dialect databricks \
+            --exclude-rules LT05 \
+            || true  # non-blocking for now; remove || true to enforce
