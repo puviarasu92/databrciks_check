@@ -30,7 +30,6 @@ jobs:
         run: |
           databricks bundle deploy \
             --target dev \
-            --var="databricks_host=$DATABRICKS_HOST" \
             --var="cluster_id=${{ secrets.CLUSTER_ID_DEV }}"
 
   deploy-prod:
@@ -52,6 +51,5 @@ jobs:
         run: |
           databricks bundle deploy \
             --target prod \
-            --var="databricks_host=$DATABRICKS_HOST" \
             --var="cluster_id=${{ secrets.CLUSTER_ID_PROD }}" \
             --var="sp_name=${{ secrets.SP_NAME_PROD }}"

@@ -26,7 +26,6 @@ jobs:
         run: |
           databricks bundle validate \
             --target dev \
-            --var="databricks_host=$DATABRICKS_HOST" \
             --var="cluster_id=${{ secrets.CLUSTER_ID_DEV }}"
 
   sql-lint:

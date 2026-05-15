@@ -23,10 +23,7 @@ targets:
   dev:
     mode: development
     default: true
-    workspace:
-      host: ${var.databricks_host}
     variables:
-      databricks_host: ""
       catalog: "dev_catalog"
       schema: "etl"
       cluster_id: ""
@@ -34,10 +31,8 @@ targets:
   prod:
     mode: production
     workspace:
-      host: ${var.databricks_host}
       root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
     variables:
-      databricks_host: ""
       catalog: "prod_catalog"
       schema: "etl"
       cluster_id: ""
@@ -45,8 +40,6 @@ targets:
       service_principal_name: "${var.sp_name}"
 
 variables:
-  databricks_host:
-    description: "Databricks workspace URL"
   catalog:
     description: "Unity Catalog name"
   schema:
