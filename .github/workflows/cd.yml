@@ -1,0 +1,57 @@
+# CD Pipeline – deploys to dev on push to main, prod on release
+name: CD - Deploy
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-dev:
+    name: Deploy to Dev
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Deploy bundle to dev
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_DEV }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_DEV }}
+        run: |
+          databricks bundle deploy \
+            --target dev \
+            --var="databricks_host=$DATABRICKS_HOST" \
+            --var="cluster_id=${{ secrets.CLUSTER_ID_DEV }}"
+
+  deploy-prod:
+    name: Deploy to Prod
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Deploy bundle to prod
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_PROD }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_PROD }}
+        run: |
+          databricks bundle deploy \
+            --target prod \
+            --var="databricks_host=$DATABRICKS_HOST" \
+            --var="cluster_id=${{ secrets.CLUSTER_ID_PROD }}" \
+            --var="sp_name=${{ secrets.SP_NAME_PROD }}"
