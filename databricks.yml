@@ -16,7 +16,7 @@ resources:
             base_parameters:
               catalog: "${var.catalog}"
               schema: "${var.schema}"
-          existing_cluster_id: "${var.cluster_id}"
+            warehouse_id: "${var.warehouse_id}"
 
 # Target-specific overrides
 targets:
@@ -26,7 +26,7 @@ targets:
     variables:
       catalog: "dev_catalog"
       schema: "etl"
-      cluster_id: ""
+      warehouse_id: ""
 
   prod:
     mode: production
@@ -35,7 +35,7 @@ targets:
     variables:
       catalog: "prod_catalog"
       schema: "etl"
-      cluster_id: ""
+      warehouse_id: ""
     run_as:
       service_principal_name: "${var.sp_name}"
 
@@ -44,8 +44,8 @@ variables:
     description: "Unity Catalog name"
   schema:
     description: "Target schema"
-  cluster_id:
-    description: "Existing cluster ID for the job"
+  warehouse_id:
+    description: "SQL warehouse ID"
   sp_name:
     description: "Service principal for production"
     default: ""

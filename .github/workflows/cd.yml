@@ -30,7 +30,7 @@ jobs:
         run: |
           databricks bundle deploy \
             --target dev \
-            --var="cluster_id=${{ secrets.CLUSTER_ID_DEV }}"
+            --var="warehouse_id=${{ secrets.WAREHOUSE_ID_DEV }}"
 
   deploy-prod:
     name: Deploy to Prod
@@ -51,5 +51,5 @@ jobs:
         run: |
           databricks bundle deploy \
             --target prod \
-            --var="cluster_id=${{ secrets.CLUSTER_ID_PROD }}" \
+            --var="warehouse_id=${{ secrets.WAREHOUSE_ID_PROD }}" \
             --var="sp_name=${{ secrets.SP_NAME_PROD }}"
