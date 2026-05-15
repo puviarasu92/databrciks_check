@@ -26,7 +26,7 @@ jobs:
         run: |
           databricks bundle validate \
             --target dev \
-            --var="cluster_id=${{ secrets.CLUSTER_ID_DEV }}"
+            --var="warehouse_id=${{ secrets.WAREHOUSE_ID_DEV }}"
 
   sql-lint:
     name: Lint SQL Notebooks
