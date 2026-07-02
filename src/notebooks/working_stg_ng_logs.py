@@ -1,23 +1,25 @@
+# Databricks notebook source
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC # AISSR5sss Strategy — TMA Envelope + Heikin Ashi Signals
+# MAGIC Natural Gas Futures Backtest
+
+# COMMAND ----------
+
 import pandas as pd
 import numpy as np
 import http.client
 import json
-import ssl
-import os
 
-# Disable SSL verification
-ssl._create_default_https_context = ssl._create_unverified_context
+# COMMAND ----------
 
-# Create output directory
-OUTPUT_DIR = r"C:\Users\ArumuPuv\dhan_test\data"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+# MAGIC %md
+# MAGIC ## Configuration
 
-# ========================================
-# AISSR5sss Strategy — Python Implementation
-# (TMA Envelope + Heikin Ashi Signals)
-# ========================================
+# COMMAND ----------
 
-# === CONFIGURATION (matches Pine Script inputs) ===
 TMA_LENGTH = 51
 ENVELOPE_PCT = 0.10       # 0.10%
 INITIAL_CAPITAL = 1000000  # Starting capital
@@ -30,7 +32,13 @@ INPUT_TIMEFRAME = 1      # Input candle timeframe in minutes (e.g., 3, 5, 15, 20
 CANDLE_TIMEFRAME = 15     # Desired output candle timeframe in minutes
 CONVERT_TIMEFRAME = True # True = convert INPUT_TIMEFRAME to CANDLE_TIMEFRAME, False = use as-is
 
-# === 1. READ DATA FROM DHAN API ===
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 1. Read Data from Dhan API
+
+# COMMAND ----------
+
 conn = http.client.HTTPSConnection("api.dhan.co")
 payload = json.dumps({
     "securityId": "538686",
@@ -44,17 +52,11 @@ payload = json.dumps({
 headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'access-token': 'xxx'
+    'access-token': dbutils.secrets.get(scope="dhan", key="access-token")
 }
 conn.request("POST", "/v2/charts/intraday", payload, headers)
 res = conn.getresponse()
 data = json.loads(res.read().decode("utf-8"))
-
-# Save raw response to file
-response_file = os.path.join(OUTPUT_DIR, "dhan_response.json")
-with open(response_file, "w") as f:
-    json.dump(data, f, indent=2)
-print(f"Raw API response saved to {response_file}")
 
 # Parse API response into DataFrame
 df = pd.DataFrame({
@@ -68,16 +70,20 @@ df = pd.DataFrame({
 df.sort_values("Date", inplace=True)
 df.reset_index(drop=True, inplace=True)
 
-# Save OHLCV data to CSV
-ohlcv_file = os.path.join(OUTPUT_DIR, "dhan_ohlcv_data.csv")
-df.to_csv(ohlcv_file, index=False)
-print(f"OHLCV data saved to {ohlcv_file} ({len(df)} rows)")
-
 # Ensure numeric columns
 for col in ["Open", "High", "Low", "Close", "Volume"]:
     df[col] = pd.to_numeric(df[col], errors="coerce")
 
-# === 1.5. TIMEFRAME CONVERSION ===
+print(f"OHLCV data loaded: {len(df)} rows")
+display(df.head(10))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 1.5. Timeframe Conversion
+
+# COMMAND ----------
+
 if CONVERT_TIMEFRAME and CANDLE_TIMEFRAME != INPUT_TIMEFRAME:
     if CANDLE_TIMEFRAME % INPUT_TIMEFRAME != 0:
         raise ValueError(f"CANDLE_TIMEFRAME ({CANDLE_TIMEFRAME}) must be a multiple of INPUT_TIMEFRAME ({INPUT_TIMEFRAME})")
@@ -92,7 +98,13 @@ if CONVERT_TIMEFRAME and CANDLE_TIMEFRAME != INPUT_TIMEFRAME:
     }).dropna().reset_index()
     print(f"Converted {INPUT_TIMEFRAME}m candles -> {CANDLE_TIMEFRAME}m candles ({len(df)} rows)")
 
-# === 2. HEIKIN ASHI CONVERSION ===
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 2. Heikin Ashi Conversion
+
+# COMMAND ----------
+
 if IS_HEIKIN_ASHI:
     df["HA_Open"] = df["Open"]
     df["HA_High"] = df["High"]
@@ -107,21 +119,29 @@ else:
     df["HA_High"] = df[["High", "HA_Open", "HA_Close"]].max(axis=1)
     df["HA_Low"] = df[["Low", "HA_Open", "HA_Close"]].min(axis=1)
 
-# Save Heikin Ashi candles to CSV
-ha_df = df[["Date", "HA_Open", "HA_High", "HA_Low", "HA_Close", "Volume"]].copy()
-ha_df.columns = ["Date", "Open", "High", "Low", "Close", "Volume"]
-ha_file = os.path.join(OUTPUT_DIR, "NG_heikin_ashi.csv")
-ha_df.to_csv(ha_file, index=False)
-print(f"Heikin Ashi data saved to {ha_file} ({len(ha_df)} rows)")
+print(f"Heikin Ashi data: {len(df)} rows")
+display(df[["Date", "HA_Open", "HA_High", "HA_Low", "HA_Close"]].head(10))
 
-# === 3. TMA + ENVELOPE ===
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 3. TMA + Envelope Calculation
+
+# COMMAND ----------
+
 # TMA = SMA of SMA (triangular moving average)
 sma1 = df["Close"].rolling(window=TMA_LENGTH, min_periods=TMA_LENGTH).mean()
 df["TMA"] = sma1.rolling(window=TMA_LENGTH, min_periods=TMA_LENGTH).mean()
 df["Upper_Env"] = df["TMA"] * (1 + ENVELOPE_PCT / 100)
 df["Lower_Env"] = df["TMA"] * (1 - ENVELOPE_PCT / 100)
 
-# === 4. SIGNAL CONDITIONS ===
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 4. Signal Conditions
+
+# COMMAND ----------
+
 # Bull: all HA OHLC above upper envelope
 df["Bull_Signal"] = (
     (df["HA_Open"] > df["Upper_Env"])
@@ -137,7 +157,7 @@ df["Bear_Signal"] = (
     & (df["HA_Close"] < df["Lower_Env"])
 )
 
-# === 4.5 EXPORT TMA & HEIKIN ASHI VALUES ===
+# Export TMA & Heikin Ashi values
 export_df = df[[
     "Date", "Open", "High", "Low", "Close", "Volume",
     "HA_Open", "HA_High", "HA_Low", "HA_Close",
@@ -145,19 +165,18 @@ export_df = df[[
     "Bull_Signal", "Bear_Signal"
 ]].copy()
 
-# Format signal columns as YES/NO for readability
 export_df["Bull_Signal"] = export_df["Bull_Signal"].apply(lambda x: "YES" if x else "NO")
 export_df["Bear_Signal"] = export_df["Bear_Signal"].apply(lambda x: "YES" if x else "NO")
 
-# Format numeric columns to 2 decimal places
-for col in ["Open", "High", "Low", "Close", "HA_Open", "HA_High", "HA_Low", "HA_Close", "TMA", "Upper_Env", "Lower_Env"]:
-    export_df[col] = export_df[col].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "")
+display(export_df.tail(20))
 
-tma_file = os.path.join(OUTPUT_DIR, "TMA_HEIKIN_ASHI_VALUES.csv")
-export_df.to_csv(tma_file, index=False)
-print(f"TMA & Heikin Ashi values saved to {tma_file} ({len(export_df)} rows)")
+# COMMAND ----------
 
-# === 5. STRATEGY SIMULATION ===
+# MAGIC %md
+# MAGIC ## 5. Strategy Simulation
+
+# COMMAND ----------
+
 trades = []          # Completed trade log
 capital = INITIAL_CAPITAL  # Running capital
 position = 0         # +1 = long, -1 = short, 0 = flat
@@ -249,7 +268,6 @@ for i in range(len(df)):
 
     # --- REVERSAL: Close position on opposite signal ---
     if position == 1 and bear:
-        # Close remaining long
         pnl = (close - entry_price) * remaining_qty * LOT_SIZE
         capital += pnl
         trades.append({
@@ -260,14 +278,12 @@ for i in range(len(df)):
             "Exit_Reason": "REVERSAL"
         })
         position = 0
-        # Set up pending short
         signal_state = -1
         sig_high = high
         sig_low = low
         sig_range = sig_high - sig_low
 
     elif position == -1 and bull:
-        # Close remaining short
         pnl = (entry_price - close) * remaining_qty * LOT_SIZE
         capital += pnl
         trades.append({
@@ -278,7 +294,6 @@ for i in range(len(df)):
             "Exit_Reason": "REVERSAL"
         })
         position = 0
-        # Set up pending long
         signal_state = 1
         sig_high = high
         sig_low = low
@@ -298,7 +313,6 @@ for i in range(len(df)):
                 sig_low = low
                 sig_range = sig_high - sig_low
 
-        # Replace pending signal if opposite appears
         elif signal_state == 1 and bear:
             signal_state = -1
             sig_high = high
@@ -350,10 +364,16 @@ if position != 0:
         "PnL": pnl, "Capital": capital, "Exit_Reason": "END_OF_DATA"
     })
 
-# === 6. RESULTS ===
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 6. Results & Summary
+
+# COMMAND ----------
+
 trade_df = pd.DataFrame(trades)
 print("=" * 70)
-print("AISSR5sss STRATEGY RESULTS — NATURALGAS APR FUT")
+print("AISSR5sss STRATEGY RESULTS — NATURALGAS FUT")
 print("=" * 70)
 
 if trade_df.empty:
@@ -384,12 +404,26 @@ else:
     print(f"Avg PnL/Trade    : {trade_df['PnL'].mean():.2f}")
     print(f"Max Profit       : {trade_df['PnL'].max():.2f}")
     print(f"Max Loss         : {trade_df['PnL'].min():.2f}")
-    print(f"\n{'='*70}")
-    print("TRADE LOG:")
-    print("=" * 70)
-    print(trade_df.to_string(index=False))
 
-    # === 7. EXPORT TO CSV ===
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 7. Trade Log
+
+# COMMAND ----------
+
+if not trade_df.empty:
+    display(trade_df)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 8. Save Results to DBFS
+
+# COMMAND ----------
+
+if not trade_df.empty:
+    # Save to DBFS
     summary_df = pd.DataFrame({
         "Metric": [
             "Initial Capital", "Final Capital", "Total PnL", "ROI (%)",
@@ -409,10 +443,8 @@ else:
         ]
     })
 
-    summary_file = os.path.join(OUTPUT_DIR, "NG_backtest_summary.csv")
-    trades_file = os.path.join(OUTPUT_DIR, "NG_backtest_trades.csv")
-    summary_df.to_csv(summary_file, index=False)
-    trade_df.to_csv(trades_file, index=False)
-    print(f"\nSummary saved to {summary_file}")
-    print(f"Trade log saved to {trades_file}")
+    summary_df.to_csv("/dbfs/tmp/NG_backtest_summary.csv", index=False)
+    trade_df.to_csv("/dbfs/tmp/NG_backtest_trades.csv", index=False)
+    print("Summary saved to /dbfs/tmp/NG_backtest_summary.csv")
+    print("Trade log saved to /dbfs/tmp/NG_backtest_trades.csv")
 
