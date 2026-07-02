@@ -23,6 +23,8 @@ targets:
   dev:
     mode: development
     default: true
+    workspace:
+      root_path: /Workspace/Repos/${workspace.current_user.userName}/${bundle.name}
     variables:
       catalog: "dev_catalog"
       schema: "etl"
@@ -31,7 +33,7 @@ targets:
   prod:
     mode: production
     workspace:
-      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+      root_path: /Workspace/Repos/${workspace.current_user.userName}/${bundle.name}
     variables:
       catalog: "prod_catalog"
       schema: "etl"
